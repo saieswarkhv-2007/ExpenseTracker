@@ -12,9 +12,25 @@ API.interceptors.request.use(
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
+    // Ensure Content-Type is set for all requests
+    config.headers["Content-Type"] = "application/json";
     return config;
   },
   (error) => Promise.reject(error)
+);
+
+// Response interceptor for handling 401 errors
+API.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response?.status === 401) {
+      // Clear invalid token and redirect to login
+      localStorage.removeItem("token");
+      localStorage.removeItem("userRole");
+      window.location.href = "/";
+    }
+    return Promise.reject(error);
+  }
 );
 
 // ─── Node / MongoDB API (port 5001) ──────────────────────────────────────────

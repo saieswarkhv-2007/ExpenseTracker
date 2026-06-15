@@ -29,37 +29,83 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private UserRepository userRepository;
 
     @Override
-    protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
+    protected void doFilterInternal(
+            HttpServletRequest request,
+            HttpServletResponse response,
+            FilterChain filterChain)
             throws ServletException, IOException {
+
+        // Allow CORS preflight requests
+        if ("OPTIONS".equalsIgnoreCase(request.getMethod())) {
+            filterChain.doFilter(request, response);
+            return;
+        }
 
         String authHeader = request.getHeader("Authorization");
         String token = null;
         String username = null;
 
-        if (authHeader != null && authHeader.startsWith("Bearer ")) {
-            token = authHeader.substring(7);
-            try {
-                username = jwtUtil.extractUsername(token);
-            } catch (Exception e) {
-                // Ignore extraction failures, context remains unauthenticated
-            }
-        }
+        try {
 
-        if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) {
-            if (jwtUtil.validateToken(token)) {
-                User user = userRepository.findByEmail(username);
-                if (user != null) {
-                    String roleName = user.getRole() != null ? user.getRole().getName() : "USER";
-                    String authority = "ROLE_" + roleName.toUpperCase();
-                    
-                    UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
-                            user, null, Collections.singletonList(new SimpleGrantedAuthority(authority))
-                    );
-                    authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
-                    SecurityContextHolder.getContext().setAuthentication(authToken);
+            if (authHeader != null && authHeader.startsWith("Bearer ")) {
+
+                token = authHeader.substring(7);
+
+                try {
+                    username = jwtUtil.extractUsername(token);
+                } catch (Exception e) {
+                    System.out.println("JWT extraction failed: " + e.getMessage());
                 }
             }
+
+            if (username != null &&
+                SecurityContextHolder.getContext().getAuthentication() == null) {
+
+                if (jwtUtil.validateToken(token)) {
+
+                    User user = userRepository.findByEmail(username);
+
+                    if (user != null) {
+
+                        String roleName =
+                                user.getRole() != null
+                                ? user.getRole().getName()
+                                : "USER";
+
+                        String authority =
+                                "ROLE_" + roleName.toUpperCase();
+
+                        UsernamePasswordAuthenticationToken authToken =
+                                new UsernamePasswordAuthenticationToken(
+                                        user,
+                                        null,
+                                        Collections.singletonList(
+                                                new SimpleGrantedAuthority(authority)
+                                        )
+                                );
+
+                        authToken.setDetails(
+                                new WebAuthenticationDetailsSource()
+                                        .buildDetails(request)
+                        );
+
+                        SecurityContextHolder.getContext()
+                                             .setAuthentication(authToken);
+
+                        System.out.println(
+                                "Authenticated User: "
+                                + username
+                                + " | Authority: "
+                                + authority
+                        );
+                    }
+                }
+            }
+
+        } catch (Exception e) {
+            System.out.println("JWT Filter Error: " + e.getMessage());
         }
+
         filterChain.doFilter(request, response);
     }
 }

@@ -14,10 +14,30 @@ function Users() {
     setLoading(true);
     setError("");
     try {
+      const token = localStorage.getItem("token");
+      if (!token) {
+        setError("No authentication token found. Please log in again.");
+        navigate("/");
+        return;
+      }
+      
       const res = await API.get("/admin/users");
       setUsers(res.data || []);
-    } catch {
-      setError("Failed to load user data from server. Ensure you have administrator rights.");
+    } catch (err) {
+      console.error("Error fetching users:", err);
+      
+      // Provide specific error messages based on the error type
+      if (err.response?.status === 401) {
+        setError("Unauthorized: Your session has expired or you don't have admin privileges. Please log in again.");
+        localStorage.removeItem("token");
+        localStorage.removeItem("userRole");
+      } else if (err.response?.status === 403) {
+        setError("Forbidden: You don't have permission to access user data.");
+      } else if (err.response?.status === 0 || err.message === "Network Error") {
+        setError("Network error: Unable to connect to the server. Ensure the server is running on port 2000.");
+      } else {
+        setError("Failed to load user data from server. Ensure you have administrator rights.");
+      }
     } finally {
       setLoading(false);
     }
